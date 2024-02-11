@@ -22,7 +22,7 @@ public class Server {
     private Long id;
     @Column(unique = true)
     @NotEmpty(message = "IP address cannot be empty")
-    private String ipAdress;
+    private String ipAddress;
     private String name;
     private String memory;
     private String type;
