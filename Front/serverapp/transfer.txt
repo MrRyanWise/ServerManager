@@ -54,3 +54,61 @@ npm ERR!     C:\Users\psxd044\AppData\Roaming\npm-cache\_logs\2024-02-23T09_30_5
 24 error Failed at the h7z-project@0.0.4-SNAPSHOT start script.
 24 error This is probably not a problem with npm. There is likely additional logging output above.
 25 verbose exit [ 1, true ]
+<<<<<<<<<
+describe('ListPieceComponent2', () => {
+  const activatedRoute = createSpyObj('ActivatedRoute', [], {snapshot: getParamMap("1234")} )
+  const component = new ListPieceComponent(activatedRoute);
+  component.pieces = [
+    {
+      identifiant: '12345456',
+      libelle: '',
+      dateAcquisition: null,
+      categorie: {
+        code: 'CT01',
+        libelle: 'Mon libelle'
+      },
+      format: 'PDF',
+      taille:'33',
+      document: 'JVBERi0xLjQKJdPr6eEKMSAwIG9iago8PC9DcmVhdG9yIChNb3ppbGxhLzUuMCBcKFdpbmRvd3MgTlQgMTAuMD',
+
+      contenuToBlob(): Blob {
+        return null;
+      },
+
+      getBlobProperty(): BlobPropertyBag {
+        return null;
+      }
+    }];
+  function getParamMap(id: string) {
+    const paramMap = new Map<string, string>();
+    paramMap.set('identifiantDossierCollecte', id);
+    return { paramMap };
+  }
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+  it('should set pieces from route snapshot data', () => {
+    const piecesResult: PieceDemande[] = [
+      {
+        identifiant: '12345456',
+        libelle: '',
+        dateAcquisition: null,
+        categorie: {
+          code: 'CT01',
+          libelle: 'Mon libelle'
+        },
+        format: 'PDF',
+        taille:'33',
+        document: 'JVBERi0xLjQKJdPr6eEKMSAwIG9iago8PC9DcmVhdG9yIChNb3ppbGxhLzUuMCBcKFdpbmRvd3MgTlQgMTAuMD',
+
+        contenuToBlob(): Blob {
+          return null;
+        },
+
+        getBlobProperty(): BlobPropertyBag {
+          return null;
+        }
+      }]
+    expect(component.pieces).toEqual(piecesResult);
+  });
+});
