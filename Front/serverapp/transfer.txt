@@ -112,3 +112,16 @@ describe('ListPieceComponent2', () => {
     expect(component.pieces).toEqual(piecesResult);
   });
 });
+///////////////////
+
+  constructor(private http: NetworkService) {
+  }
+
+  /**
+   * Renvoie un dossier en fonction du dossier demandé
+   * @param identifiantDossierCollecte
+   */
+  public recupererPiecesDemande(identifiantDossier: string): Observable<PieceDemande[]> {
+    const expandData = {identifiantDossier};
+    return this.http.get<PieceDemande[]>(KEY_RECUPERATION_PIECE_DEMANDE, expandData, 'PieceService', 'recupererPiecesDemande');
+  }
