@@ -150,3 +150,32 @@ describe('ListPieceComponent2', () => {
    }
 
  }
+
+///
+
+import {ActivatedRouteSnapshot, Resolve, RouterStateSnapshot} from "@angular/router";
+import {Observable} from "rxjs";
+import {inject, Injectable} from "@angular/core";
+import {PieceService} from "./piece.service";
+import {PieceDemande} from "../model/PieceDemande";
+import {map} from "rxjs/operators";
+
+@Injectable({
+  providedIn: 'root'
+})
+export class PieceResolver implements Resolve<Observable<PieceDemande[]>> {
+
+  private pieceService = inject(PieceService);
+
+  resolve(route: ActivatedRouteSnapshot, state: RouterStateSnapshot): Observable<PieceDemande[]> {
+    return this.pieceService.recupererPiecesDemande(route.paramMap.get('identifiantDossierCollecte')).pipe(map(
+      pieces => pieces.map(
+        piece => {
+          let instance = new PieceDemande();
+          Object.assign(instance, piece);
+          return instance;
+        })
+    ));
+  }
+
+}
