@@ -114,14 +114,39 @@ describe('ListPieceComponent2', () => {
 });
 ///////////////////
 
-  constructor(private http: NetworkService) {
-  }
+ import {Injectable} from "@angular/core";
+ import {NetworkService} from "./shared/network.service";
+ import {Observable} from "rxjs";
+ import {PieceDemande} from "../model/PieceDemande";
+ import {KEY_RECUPERATION_PIECE_DEMANDE} from "../utils/api-map-constantes";
 
-  /**
-   * Renvoie un dossier en fonction du dossier demandé
-   * @param identifiantDossierCollecte
-   */
-  public recupererPiecesDemande(identifiantDossier: string): Observable<PieceDemande[]> {
-    const expandData = {identifiantDossier};
-    return this.http.get<PieceDemande[]>(KEY_RECUPERATION_PIECE_DEMANDE, expandData, 'PieceService', 'recupererPiecesDemande');
-  }
+ @Injectable({
+   providedIn: 'root'
+ })
+ export class PieceService {
+
+
+   constructor(private http: NetworkService) {
+   }
+
+   /**
+    * Renvoie un dossier en fonction du dossier demandé
+    * @param identifiantDossierCollecte
+    */
+   public recupererPiecesDemande(identifiantDossier: string): Observable<PieceDemande[]> {
+     const expandData = {identifiantDossier};
+     return this.http.get<PieceDemande[]>(KEY_RECUPERATION_PIECE_DEMANDE, expandData, 'PieceService', 'recupererPiecesDemande');
+   }
+
+   /**
+    * Permet de creer un Blob depuis le pdf encodé
+    */
+   public pdfToBlob(pdf: string): Blob {
+     //conversion du pdf encodé en byte
+     const pdfByte = atob(pdf);
+     const pdfDecode = new TextDecoder().decode(Uint8Array.from(pdfByte, element => element.codePointAt(0)));
+     //construction de l'objet a partir duquel l'url sera généré
+     return new Blob([pdfDecode], {type: 'application/pdf'});
+   }
+
+ }
