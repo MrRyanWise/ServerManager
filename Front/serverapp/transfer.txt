@@ -179,3 +179,4 @@ export class PieceResolver implements Resolve<Observable<PieceDemande[]>> {
   }
 
 }
+g
