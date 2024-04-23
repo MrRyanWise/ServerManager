@@ -408,3 +408,72 @@ public class PieceDemandeControllerTest extends DefaultCanalTest {
 
 
 }
+------------------
+import fr.laposte.disf.canal.h7z.api.piecedemande.PieceDemandeController;
+import fr.laposte.disf.canal.h7z.domain.Contenu;
+import fr.laposte.disf.canal.h7z.domain.service.ContenuService;
+import fr.laposte.disf.canal.h7z.domain.ContextePiece;
+import fr.laposte.disfe.fwroa.test.bootstrap.DefaultCanalTest;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.junit.MockitoJUnitRunner;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
+
+@RunWith(MockitoJUnitRunner.class)
+public class PieceDemandeControllerTest extends DefaultCanalTest {
+
+    private MockMvc mockMvc;
+
+    @Mock
+    private ContenuService contenuService;
+
+    PieceDemandeController pieceDemandeController;
+
+    @Before
+    public void prepare() {
+        pieceDemandeController = new PieceDemandeController(null, null, contenuService);
+        mockMvc = standaloneSetup(pieceDemandeController).build();
+    }
+
+    @Test
+    public void testRecupererContenuPdf() throws Exception {
+        // Configuration des valeurs de test
+        String identifiantPiece = "PIECE123";
+        String codeTypologie = "TYP1";
+        String codeContexte = "CTX1";
+        String codeEtablissement = "EST1";
+        String codeAuthentification = "AUTH1";
+
+        // Création d'un objet Contenu de test
+        Contenu contenu = new Contenu();
+        contenu.setContenu(new byte[]{1, 2, 3, 4}); // exemple de contenu
+
+        // Simuler le comportement du service
+        Mockito.doReturn(contenu).when(contenuService).recuperer(identifiantPiece, codeTypologie, 
+            ContextePiece.builder()
+            .codeContexte(codeContexte)
+            .codeEtablissement(codeEtablissement)
+            .codeAuthentification(codeAuthentification)
+            .build());
+
+        // Effectuer la requête GET à l'URL de la méthode testée
+        MvcResult mvcResult = mockMvc.perform(
+            get("/api/v1/demande/piece/{identifiantPiece}", identifiantPiece)
+            .param("codeTypologie", codeTypologie)
+            .param("codeContexte", codeContexte)
+            .param("codeEtablissement", codeEtablissement)
+            .param("codeAuthentification", codeAuthentification)
+            .contentType(MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(status().isOk()) // Vérifier que la réponse est OK
+            .andReturn();
+    }
+}
