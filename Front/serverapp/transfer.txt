@@ -179,4 +179,76 @@ export class PieceResolver implements Resolve<Observable<PieceDemande[]>> {
   }
 
 }
-g
+
+
+/////////////////////////////////////
+
+import { TestBed } from '@angular/core/testing';
+import { PieceResolver } from './piece-resolver.service';
+import { RouterTestingModule } from '@angular/router/testing';
+import { ActivatedRouteSnapshot, RouterStateSnapshot, Router } from '@angular/router';
+import { of } from 'rxjs';
+import { PieceService } from './piece.service'; // Import du service de pièces
+import { PieceDemande } from './piece-demande.model'; // Import du modèle de pièce demande
+
+describe('PieceResolver', () => {
+  let resolver: PieceResolver;
+  let pieceServiceSpy: jasmine.SpyObj<PieceService>;
+  let routerSpy: jasmine.SpyObj<Router>;
+
+  beforeEach(() => {
+    const pieceServiceSpyObj = jasmine.createSpyObj('PieceService', ['recupererPiecesDemande']);
+    const routerSpyObj = jasmine.createSpyObj('Router', ['navigateByUrl']);
+
+    TestBed.configureTestingModule({
+      imports: [RouterTestingModule],
+      providers: [
+        { provide: PieceService, useValue: pieceServiceSpyObj },
+        { provide: Router, useValue: routerSpyObj }
+      ]
+    });
+
+    resolver = TestBed.inject(PieceResolver);
+    pieceServiceSpy = TestBed.inject(PieceService) as jasmine.SpyObj<PieceService>;
+    routerSpy = TestBed.inject(Router) as jasmine.SpyObj<Router>;
+  });
+
+  it('should be created', () => {
+    expect(resolver).toBeTruthy();
+  });
+
+  it('should resolve pieces', () => {
+    const pieces: PieceDemande[] = []; // Mettez vos données de test ici
+    pieceServiceSpy.recupererPiecesDemande.and.returnValue(of(pieces));
+
+    const route: ActivatedRouteSnapshot = new ActivatedRouteSnapshot();
+    route.paramMap = jasmine.createSpyObj('ParamMap', ['get']);
+    route.paramMap.get.and.returnValue('dummyId');
+
+    const state: RouterStateSnapshot = jasmine.createSpyObj('RouterStateSnapshot', ['toString']);
+
+    resolver.resolve(route, state).subscribe(resolvedPieces => {
+      expect(resolvedPieces).toEqual(pieces);
+    });
+
+    expect(pieceServiceSpy.recupererPiecesDemande).toHaveBeenCalledWith('dummyId');
+  });
+
+  it('should handle error', () => {
+    pieceServiceSpy.recupererPiecesDemande.and.returnValue(of(null)); // Simuler une erreur
+
+    const route: ActivatedRouteSnapshot = new ActivatedRouteSnapshot();
+    route.paramMap = jasmine.createSpyObj('ParamMap', ['get']);
+    route.paramMap.get.and.returnValue('dummyId');
+
+    const state: RouterStateSnapshot = jasmine.createSpyObj('RouterStateSnapshot', ['toString']);
+
+    resolver.resolve(route, state).subscribe(resolvedPieces => {
+      expect(resolvedPieces).toBeNull();
+      expect(routerSpy.navigateByUrl).toHaveBeenCalledWith('/error');
+    });
+
+    expect(pieceServiceSpy.recupererPiecesDemande).toHaveBeenCalledWith('dummyId');
+  });
+});
+
