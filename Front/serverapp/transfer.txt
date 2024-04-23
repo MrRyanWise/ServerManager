@@ -458,7 +458,7 @@ public class PieceDemandeControllerTest extends DefaultCanalTest {
         contenu.setContenu(new byte[]{1, 2, 3, 4}); // exemple de contenu
 
         // Simuler le comportement du service
-        Mockito.doReturn(contenu).when(contenuService).recuperer(identifiantPiece, codeTypologie, 
+        Mockito.doReturn(contenu).when(contenuService).recuperer(identifiantPiece, codeTypologie,
             ContextePiece.builder()
             .codeContexte(codeContexte)
             .codeEtablissement(codeEtablissement)
@@ -477,3 +477,489 @@ public class PieceDemandeControllerTest extends DefaultCanalTest {
             .andReturn();
     }
 }
+
+
+
+
+
+
+ààààààààààà
+GedAccesseur
+package fr.laposte.disf.canal.h7z.isolation.ged;
+
+import fr.laposte.disf.canal.h7z.domain.ContextePiece;
+import fr.laposte.disf.canal.h7z.domain.PieceDemande;
+import fr.laposte.disf.canal.h7z.isolation.ged.modele.ListeObjetsV3;
+import fr.laposte.disf.canal.h7z.isolation.ged.modele.QNIFlux;
+import fr.laposte.disf.canal.h7z.trace.dpi.TracesDpiUtils;
+import fr.laposte.disf.fwmc.arch.rest.http.ReactorAsyncRestOperations;
+import fr.laposte.disf.fwmc.core.ApplicationManager;
+import fr.laposte.disf.fwmc.core.log.Logger;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriComponentsBuilder;
+import reactor.core.publisher.Mono;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static fr.laposte.disf.canal.h7z.api.piecedemande.ApiMapConstantes.KEY_RECUPERER_DOCUMENT;
+
+@Component
+@RequiredArgsConstructor(onConstructor = @__(@Autowired))
+public class GedAccesseur {
+
+    private static final Logger LOGGER = ApplicationManager.getLogger(GedAccesseur.class);
+
+    private final Map<String, String> api;
+
+    private static final String IDLOGIQUE = "idLogique";
+    private static final String CODE_CONTEXTE = "codeContexte";
+    private static final String CODE_ETAB = "codeEtab";
+    private static final String CODE_AUTH = "codeAuth";
+    private static final String CODE_TYPOLOGIE = "codeTypologie";
+
+    private final ReactorAsyncRestOperations reactAsyncRestOperations;
+
+
+    public ListeObjetsV3 recupererPiece(String idContenu, ContextePiece contextePiece) {
+
+        final String url = ApplicationManager.getProperty("URL_RECHERCHER_LISTE_OBJET_GED_V3");
+        final String nomsParametres = "[ID_CONTENU]";
+        final String valeursParametres = "[".concat(idContenu).concat("]");
+
+        try {
+            LOGGER.debug("QNI [listerObjet] url : %s", url);
+            LOGGER.debug("QNI [listerObjet] noms parametres : %s, valeurs : %s", nomsParametres, valeursParametres);
+            LOGGER.debug("QNI [listerObjet] valeurs parametres : %s", valeursParametres);
+            LOGGER.debug("QNI [listerObjet] contexte : %s", contextePiece);
+
+            return reactAsyncRestOperations.getForEntity(url, ListeObjetsV3.class, contextePiece.getCodeEtablissement(),
+                    contextePiece.getCodeAuthentification(), contextePiece.getCodeContexte(), nomsParametres, valeursParametres).map(ResponseEntity::getBody).block();
+
+        } catch (Exception ex) {
+            TracesDpiUtils.tracerErreur(3, ex, GedAccesseur.class);
+            LOGGER.error("QNI [listerObjetsV3] url : %s, criteres : %s, valeur : %s, contexte : %s", url, nomsParametres, valeursParametres, contextePiece);
+            throw ex;
+        }
+    }
+
+    public QNIFlux recupererDocumentSiPlusieursContextes(String idPiece, String codeTypologie, List<ContextePiece> contextes) {
+
+        String serviceUrl = api.get(KEY_RECUPERER_DOCUMENT);
+
+        String urlTemplate = getUrlTemplate(serviceUrl);
+
+        List<Mono<QNIFlux>> appelsQNI = new ArrayList<>();
+        try {
+            for (ContextePiece contexte : contextes) {
+                Map<String, String> params = new HashMap<>();
+                params.put(IDLOGIQUE, idPiece);
+                params.put(CODE_CONTEXTE, contexte.getCodeContexte());
+                params.put(CODE_ETAB, contexte.getCodeEtablissement());
+                params.put(CODE_AUTH, contexte.getCodeAuthentification());
+                params.put(CODE_TYPOLOGIE, codeTypologie);
+
+                appelsQNI.add(reactAsyncRestOperations.getForEntity(urlTemplate, QNIFlux.class, params).map(HttpEntity::getBody).doOnSuccess(bytes -> LOGGER.info("Piece GED correctement récupéré : %s", idPiece)));
+
+            }
+            return Mono.firstWithValue(appelsQNI).block();
+        } catch (Exception ex){
+            TracesDpiUtils.tracerErreur(3, ex, GedAccesseur.class);
+            throw ex;
+        }
+    }
+
+    private String getUrlTemplate(String serviceUrl) {
+        return UriComponentsBuilder.fromHttpUrl(serviceUrl)
+                .queryParam(IDLOGIQUE, "{idLogique}")
+                .queryParam(CODE_CONTEXTE, "{codeContexte}")
+                .queryParam(CODE_ETAB, "{codeEtab}")
+                .queryParam(CODE_AUTH, "{codeAuth}")
+                .queryParam(CODE_TYPOLOGIE, "{codeTypologie}")
+                .encode()
+                .toUriString();
+    }
+
+
+}
+
+^^^^^^^^Test
+package fr.laposte.disf.canal.h7z.isolation.ged;
+
+import fr.laposte.disf.canal.h7z.domain.ContextePiece;
+import fr.laposte.disf.canal.h7z.isolation.ged.modele.QNIFlux;
+import fr.laposte.disf.fwmc.arch.rest.http.ReactorAsyncRestOperations;
+import fr.laposte.disfe.fwroa.test.bootstrap.DefaultCanalTest;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import reactor.core.publisher.Mono;
+
+import java.util.List;
+import java.util.Map;
+
+import static fr.laposte.disf.canal.h7z.api.piecedemande.ApiMapConstantes.KEY_RECUPERER_DOCUMENT;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+
+@ExtendWith(MockitoExtension.class)
+class GedAccesseurTest extends DefaultCanalTest {
+
+    @Mock
+    private Map<String, String> api;
+
+    @Mock
+    private ReactorAsyncRestOperations reactAsyncRestOperations;
+
+    private GedAccesseur gedAccesseur;
+
+    @BeforeEach
+    void init(){
+        gedAccesseur = new GedAccesseur(api, reactAsyncRestOperations);
+    }
+
+    @Test
+    void doitRecupererContenuPdf(){
+        given(api.get(KEY_RECUPERER_DOCUMENT)).willReturn("http://localhost:8090/url");
+        given(reactAsyncRestOperations.getForEntity(any(), eq(QNIFlux.class), anyMap())).willReturn(Mono.empty());
+        var captor = ArgumentCaptor.forClass(Map.class);
+        gedAccesseur.recupererDocumentSiPlusieursContextes("123456", "T0021",
+            List.of(ContextePiece
+                .builder()
+                .codeContexte("X00018")
+                .codeAuthentification("h1e4")
+                .codeEtablissement("00")
+                .build())
+        );
+
+        verify(reactAsyncRestOperations).getForEntity(anyString(), eq(QNIFlux.class), captor.capture());
+
+        assertThat(captor.getValue()).contains(
+            Map.entry("idLogique", "123456"),
+            Map.entry("codeContexte", "X00018"),
+            Map.entry("codeEtab", "00"),
+            Map.entry("codeAuth", "h1e4"),
+            Map.entry("codeTypologie", "T0021")
+        );
+    }
+
+}
+
+^^^^^^Îsoltion
+package fr.laposte.disf.canal.h7z.isolation.ged;
+
+import fr.laposte.disf.canal.h7z.domain.Contenu;
+import fr.laposte.disf.canal.h7z.domain.ContextePiece;
+import fr.laposte.disf.canal.h7z.domain.PieceDemande;
+import fr.laposte.disf.canal.h7z.isolation.ged.modele.InformationsPieceGED;
+import fr.laposte.disf.canal.h7z.isolation.mapper.ContenuMapper;
+import fr.laposte.disf.canal.h7z.isolation.mapper.PieceDemandeFactory;
+import fr.laposte.disf.fwmc.core.ApplicationManager;
+import fr.laposte.disf.fwmc.core.log.Logger;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+@Component
+@RequiredArgsConstructor(onConstructor = @__(@Autowired))
+public class GedIsolationManager {
+
+    private static final Logger LOG = ApplicationManager.getLogger(GedIsolationManager.class);
+
+    private final GedAccesseur gedAccesseur;
+
+    private final PieceDemandeFactory pieceDemandeFactory;
+
+    private final ContenuMapper mapper;
+
+
+
+    public InformationsPieceGED recupererInformationsPieceGED(String identifiant, ContextePiece contextePiece) {
+        return pieceDemandeFactory.apply(gedAccesseur.recupererPiece(identifiant, contextePiece).getObjets());
+    }
+
+    public Contenu recupererDocumentSiPlusieursContextes(String idPiece, String codeTypologie, List<ContextePiece> contextes) {
+        var qniFLux = gedAccesseur.recupererDocumentSiPlusieursContextes(idPiece, codeTypologie, contextes);
+        return mapper.from(qniFLux);
+
+    }
+
+}
+
+^^^^test
+package fr.laposte.disf.canal.h7z.isolation.ged;
+
+import fr.laposte.disf.canal.h7z.fixture.ContexteFixture;
+import fr.laposte.disf.canal.h7z.fixture.ObjetV3Fixture;
+import fr.laposte.disf.canal.h7z.isolation.ged.modele.InformationsPieceGED;
+import fr.laposte.disf.canal.h7z.isolation.ged.modele.ListeObjetsV3;
+import fr.laposte.disf.canal.h7z.isolation.mapper.ContenuMapper;
+import fr.laposte.disf.canal.h7z.isolation.mapper.PieceDemandeFactory;
+import fr.laposte.disfe.fwroa.test.bootstrap.DefaultCanalTest;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class GedIsolationManagerTest extends DefaultCanalTest {
+
+
+    @Mock
+    private GedAccesseur gedAccesseur;
+
+    @Mock
+    private PieceDemandeFactory pieceDemandeFactory;
+
+    @Mock
+    private ContenuMapper mapper;
+
+    @InjectMocks
+    private GedIsolationManager gedIsolationManager;
+
+    @Test
+    void doitRecupererInformationsPieceGED() {
+        // GIVEN
+        var listeObjet = new ListeObjetsV3();
+        listeObjet.setObjets(List.of(ObjetV3Fixture.getDefault()));
+        when(gedAccesseur.recupererPiece(anyString(), any())).thenReturn(listeObjet);
+        when(pieceDemandeFactory.apply(listeObjet.getObjets()))
+                .thenReturn(InformationsPieceGED.builder().format("pdf").taille(2.72f).nomDocument("pièce jointe à la demande").dateProduction(LocalDate.of(2024, 1, 2).toString()).build());
+        // WHEN
+        var retour = gedIsolationManager.recupererInformationsPieceGED("15a13515-a1eb-4162-a1ba-4c07174f6a16", ContexteFixture.getDefault());
+        // THEN
+        assertThat(retour).usingRecursiveComparison()
+                .isEqualTo(InformationsPieceGED.builder()
+                        .format("pdf").taille(2.72f).nomDocument("pièce jointe à la demande").dateProduction(LocalDate.of(2024, 1, 2).toString()).build());
+    }
+
+    @Test
+    void doitRecupererContenuDocument(){
+        gedIsolationManager.recupererDocumentSiPlusieursContextes(any(), any(), anyList());
+        verify(gedAccesseur).recupererDocumentSiPlusieursContextes(any(), any(), anyList());
+        verify(mapper).from(any());
+    }
+
+}
+
+
+^^^^ dossier service
+package fr.laposte.disf.canal.h7z.domain.service;
+
+import fr.laposte.disf.canal.h7z.domain.ContextePiece;
+import fr.laposte.disf.canal.h7z.domain.DossierDetailDemande;
+import fr.laposte.disf.canal.h7z.domain.PieceDemande;
+import fr.laposte.disf.canal.h7z.domain.Typologie;
+import fr.laposte.disf.canal.h7z.isolation.catalogue.CatalogueIsolationManager;
+import fr.laposte.disf.canal.h7z.isolation.catalogue.modele.TypologyDHA;
+import fr.laposte.disf.canal.h7z.isolation.dossier.DossierCollecteIsolationManager;
+import fr.laposte.disf.canal.h7z.isolation.ged.GedIsolationManager;
+import fr.laposte.disf.canal.h7z.isolation.ged.modele.InformationsPieceGED;
+import fr.laposte.disf.fwmc.core.error.ApplicationException;
+import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor(onConstructor = @__(@Autowired))
+public class DossierService {
+
+    private final DossierCollecteIsolationManager dossierAdapter;
+    private final CatalogueIsolationManager catalogueAdapter;
+    private final GedIsolationManager gedAdapter;
+
+    public DossierDetailDemande recupererDossier(String idDossier) throws ApplicationException {
+        return dossierAdapter.recupererDetailDossierDemande(idDossier);
+    }
+
+    public List<PieceDemande> recupererPieces(DossierDetailDemande dossier) {
+        var contextes = dossier.getContextesPiece();
+        var setPieces = dossier.getPiecesDemande();
+        return setPieces.stream()
+            .map(piece -> ajouterInfosPiece(piece, contextes))
+            .collect(Collectors.toList());
+
+    }
+
+    private PieceDemande ajouterInfosPiece(PieceDemande pieceDemande, List<ContextePiece> contextes) {
+        String codeTypologie = getCodeTypologie(pieceDemande);
+
+        for (ContextePiece contextePiece : contextes) {
+
+            var typologyDHA = catalogueAdapter.recupererInformationsTypologieCatalogue(contextePiece, codeTypologie);
+
+            var infosGED = gedAdapter.recupererInformationsPieceGED(pieceDemande.getIdentifiant(), contextePiece);
+
+            if (StringUtils.isNotEmpty(typologyDHA.getLibelle())) {
+                mettraAJourPieceDemandeAvecInfoGed(pieceDemande, typologyDHA, infosGED);
+                pieceDemande.setContexte(contextePiece);
+                break;
+            }
+        }
+        return pieceDemande;
+    }
+
+    private String getCodeTypologie(PieceDemande pieceDemande) {
+        return pieceDemande.getTypologie().getCode();
+    }
+
+    private void mettraAJourPieceDemandeAvecInfoGed(PieceDemande pieceDemande, TypologyDHA typologyDHA, InformationsPieceGED infosGED) {
+        pieceDemande.setTypologie(Typologie.builder()
+            .code(typologyDHA.getCode())
+                        .libelle(typologyDHA.getLibelle())
+            .build());
+        pieceDemande.setFormat(infosGED.getFormat());
+        pieceDemande.setTaille(infosGED.getTaille());
+        pieceDemande.setLibelle(infosGED.getNomDocument());
+        pieceDemande.setDateAcquisition(LocalDate.parse(infosGED.getDateProduction()
+            .substring(0, 10), DateTimeFormatter.ofPattern("dd-MM-yyyy")));
+    }
+
+}
+
+
+^^^^test
+package fr.laposte.disf.canal.h7z.domain.service;
+
+import fr.laposte.disf.canal.h7z.domain.DossierDetailDemande;
+import fr.laposte.disf.canal.h7z.fixture.ContexteFixture;
+import fr.laposte.disf.canal.h7z.fixture.PieceDemandeFixture;
+import fr.laposte.disf.canal.h7z.isolation.catalogue.CatalogueIsolationManager;
+import fr.laposte.disf.canal.h7z.isolation.catalogue.modele.TypologyDHA;
+import fr.laposte.disf.canal.h7z.isolation.dossier.DossierCollecteIsolationManager;
+import fr.laposte.disf.canal.h7z.isolation.ged.GedIsolationManager;
+import fr.laposte.disf.canal.h7z.isolation.ged.modele.InformationsPieceGED;
+import fr.laposte.disf.fwmc.core.error.ApplicationException;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class DossierServiceTest {
+
+    @Mock
+    private DossierCollecteIsolationManager dossierAdapter;
+
+    @Mock
+    private CatalogueIsolationManager catalogueAdapter;
+
+    @Mock
+    private GedIsolationManager gedAdapter;
+
+    @InjectMocks
+    private DossierService dossierService;
+
+    @Test
+    void doitRecupererPieces() {
+        // GIVEN
+        var pieceDemande = PieceDemandeFixture.getDefault();
+        var dossierDetail = new DossierDetailDemande(Collections.singletonList("123456")).addContextesPiece(ContexteFixture.getDefault()).addPiecesDemande(pieceDemande);
+
+        var typologie = TypologyDHA.builder().code("T00846").libelle("Pièce jointe à la demande").build();
+        when(catalogueAdapter.recupererInformationsTypologieCatalogue(any(), anyString())).thenReturn(typologie);
+
+        InformationsPieceGED infosGed = InformationsPieceGED.builder().format("pdf").dateProduction("07-03-2024 11:53:40").taille(434.10547f).nomDocument("test nom doc").build();
+        when(gedAdapter.recupererInformationsPieceGED(anyString(), any())).thenReturn(infosGed);
+        // WHEN
+        var listePieces = dossierService.recupererPieces(dossierDetail);
+        // THEN
+        assertThat(listePieces).hasSize(1);
+        var piece = listePieces.get(0);
+        assertThat(piece.getIdentifiant()).isEqualTo("15a13515-a1eb-4162-a1ba-4c07174f6a16");
+        assertThat(piece.getLibelle()).isEqualTo("test nom doc");
+        assertThat(piece.getTypologie().getCode()).isEqualTo("T00846");
+        assertThat(piece.getTypologie().getLibelle()).isEqualTo("Pièce jointe à la demande");
+        assertThat(piece.getFormat()).isEqualTo("pdf");
+        assertThat(piece.getTaille()).isEqualTo(434.10547f);
+        assertThat(piece.getDateAcquisition()).isEqualTo(LocalDate.of(2024, 3, 7));
+        assertThat(piece.getContexte()).usingRecursiveComparison().isEqualTo(ContexteFixture.getDefault());
+
+    }
+
+    @Test
+    void doitRecupererDossier() throws ApplicationException {
+        dossierService.recupererDossier("123456");
+
+        verify(dossierAdapter).recupererDetailDossierDemande("123456");
+
+    }
+
+}
+
+^^înfopieceGed
+package fr.laposte.disf.canal.h7z.isolation.ged.modele;
+
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+@Builder
+@EqualsAndHashCode
+public class InformationsPieceGED {
+
+    private String format;
+
+    private float taille;
+
+    private String  nomDocument;
+
+    private String dateProduction;
+
+    private String codeTypologie;
+
+    public InformationsPieceGED taille(String taille) {
+            this.taille = (float) Integer.parseInt(taille) / 1024;
+            return this;
+    }
+}
+
