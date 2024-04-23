@@ -963,3 +963,212 @@ public class InformationsPieceGED {
     }
 }
 
+
+
+
+---------------------TU
+DOSSIER SERVICE
+package fr.laposte.disf.canal.h7z.domain.service;
+
+import fr.laposte.disf.canal.h7z.domain.DossierDetailDemande;
+import fr.laposte.disf.canal.h7z.domain.PieceDemande;
+import fr.laposte.disf.canal.h7z.fixture.ContexteFixture;
+import fr.laposte.disf.canal.h7z.fixture.PieceDemandeFixture;
+import fr.laposte.disf.canal.h7z.isolation.catalogue.CatalogueIsolationManager;
+import fr.laposte.disf.canal.h7z.isolation.catalogue.modele.TypologyDHA;
+import fr.laposte.disf.canal.h7z.isolation.ged.GedIsolationManager;
+import fr.laposte.disf.canal.h7z.isolation.ged.modele.InformationsPieceGED;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class DossierServiceTest {
+
+    @Mock
+    private CatalogueIsolationManager catalogueAdapter;
+
+    @Mock
+    private GedIsolationManager gedAdapter;
+
+    @InjectMocks
+    private DossierService dossierService;
+
+    @Test
+    void testAjouterInfosPieceAvecTypologyDHA() {
+        // GIVEN
+        var pieceDemande = PieceDemandeFixture.getDefault();
+        var contextes = List.of(ContexteFixture.getDefault());
+        var typologie = TypologyDHA.builder().code("T00846").libelle("Pièce jointe à la demande").build();
+
+        when(catalogueAdapter.recupererInformationsTypologieCatalogue(any(), anyString())).thenReturn(typologie);
+
+        InformationsPieceGED infosGed = InformationsPieceGED.builder().format("pdf").dateProduction("07-03-2024 11:53:40").taille(434.10547f).nomDocument("test nom doc").build();
+        when(gedAdapter.recupererInformationsPieceGED(anyString(), any())).thenReturn(infosGed);
+
+        // WHEN
+        var piece = dossierService.ajouterInfosPiece(pieceDemande, contextes);
+
+        // THEN
+        assertThat(piece.getTypologie().getLibelle()).isEqualTo("Pièce jointe à la demande");
+        assertThat(piece.getLibelle()).isEqualTo("test nom doc");
+    }
+
+    @Test
+    void testAjouterInfosPieceAvecTypologyDHAVide() {
+        // GIVEN
+        var pieceDemande = PieceDemandeFixture.getDefault();
+        var contextes = List.of(ContexteFixture.getDefault());
+        var typologieVide = TypologyDHA.builder().code("T00846").libelle("").build();
+
+        when(catalogueAdapter.recupererInformationsTypologieCatalogue(any(), anyString())).thenReturn(typologieVide);
+
+        // WHEN
+        var piece = dossierService.ajouterInfosPiece(pieceDemande, contextes);
+
+        // THEN
+        assertThat(piece.getTypologie().getLibelle()).isEqualTo(null);
+    }
+}
+
+
+////////////////////////
+package fr.laposte.disf.canal.h7z.isolation.ged;
+
+import fr.laposte.disf.canal.h7z.domain.ContextePiece;
+import fr.laposte.disf.canal.h7z.isolation.ged.modele.ListeObjetsV3;
+import fr.laposte.disfe.fwroa.test.bootstrap.DefaultCanalTest;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import reactor.core.publisher.Mono;
+import org.springframework.http.ResponseEntity;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class GedAccesseurTest extends DefaultCanalTest {
+
+    @Mock
+    private ReactorAsyncRestOperations reactAsyncRestOperations;
+
+    private GedAccesseur gedAccesseur;
+
+    @BeforeEach
+    void setUp() {
+        gedAccesseur = new GedAccesseur(null, reactAsyncRestOperations);
+    }
+
+    @Test
+    void doitRecupererPiece() {
+        var contextePiece = ContextePiece.builder()
+                .codeAuthentification("authCode")
+                .codeContexte("contexteCode")
+                .codeEtablissement("etabCode")
+                .build();
+
+        var listeObjets = new ListeObjetsV3();
+        
+        given(reactAsyncRestOperations.getForEntity(anyString(), eq(ListeObjetsV3.class), any()))
+            .willReturn(Mono.just(ResponseEntity.ok(listeObjets)));
+
+        var result = gedAccesseur.recupererPiece("1234", contextePiece);
+
+        assertThat(result).isEqualTo(listeObjets);
+
+        var captor = ArgumentCaptor.forClass(String.class);
+        verify(reactAsyncRestOperations).getForEntity(captor.capture(), eq(ListeObjetsV3.class), any());
+    }
+
+    @Test
+    void doitGererExceptionLorsDeRecuperationDePiece() {
+        var contextePiece = ContextePiece.builder()
+                .codeAuthentification("authCode")
+                .codeContexte("contexteCode")
+                .codeEtablissement("etabCode")
+                .build();
+
+        given(reactAsyncRestOperations.getForEntity(anyString(), eq(ListeObjetsV3.class), any()))
+            .willReturn(Mono.error(new RuntimeException("Erreur de récupération")));
+
+        try {
+            gedAccesseur.recupererPiece("1234", contextePiece);
+            fail("Expected RuntimeException to be thrown");
+        } catch (RuntimeException e) {
+            assertThat(e.getMessage()).contains("Erreur de récupération");
+        }
+    }
+}
+
+
+
+
+
+
+@Test
+void doitRecupererPremierDocumentAvecPlusieursContextes() {
+    given(api.get(KEY_RECUPERER_DOCUMENT)).willReturn("http://localhost:8090/url");
+    
+    var contexte1 = ContextePiece.builder()
+            .codeContexte("contexte1")
+            .codeAuthentification("auth1")
+            .codeEtablissement("etab1")
+            .build();
+    
+    var contexte2 = ContextePiece.builder()
+            .codeContexte("contexte2")
+            .codeAuthentification("auth2")
+            .codeEtablissement("etab2")
+            .build();
+    
+    var flux1 = new QNIFlux();
+    var flux2 = new QNIFlux();
+    
+    given(reactAsyncRestOperations.getForEntity(anyString(), eq(QNIFlux.class), any()))
+        .willReturn(Mono.just(flux1), Mono.just(flux2));
+    
+    var result = gedAccesseur.recupererDocumentSiPlusieursContextes("1234", "T0021", List.of(contexte1, contexte2));
+    
+    assertThat(result).isEqualTo(flux1);
+}
+
+@Test
+void doitGererExceptionLorsDeRecuperationSiPlusieursContextes() {
+    given(api.get(KEY_RECUPERER_DOCUMENT)).willReturn("http://localhost:8090/url");
+    
+    var contexte1 = ContextePiece.builder()
+            .codeContexte("contexte1")
+            .codeAuthentification("auth1")
+            .codeEtablissement("etab1")
+            .build();
+    
+    given(reactAsyncRestOperations.getForEntity(anyString(), eq(QNIFlux.class), any()))
+        .willReturn(Mono.error(new RuntimeException("Erreur lors de la récupération")));
+    
+    try {
+        gedAccesseur.recupererDocumentSiPlusieursContextes("1234", "T0021", List.of(contexte1));
+        fail("Expected RuntimeException to be thrown");
+    } catch (RuntimeException e) {
+        assertThat(e.getMessage()).contains("Erreur lors de la récupération");
+    }
+}
+
+
