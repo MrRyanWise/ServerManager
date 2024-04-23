@@ -252,3 +252,159 @@ describe('PieceResolver', () => {
   });
 });
 
+::::::::::
+package fr.laposte.disf.canal.h7z.api.piecedemande;
+
+import fr.laposte.disf.canal.client.h5z.modeles.ErrorModel;
+import fr.laposte.disf.canal.h7z.api.piecedemande.mapper.PieceDemandeMapper;
+import fr.laposte.disf.canal.h7z.api.piecedemande.model.PieceDemandeApi;
+import fr.laposte.disf.canal.h7z.domain.Contenu;
+import fr.laposte.disf.canal.h7z.domain.ContextePiece;
+import fr.laposte.disf.canal.h7z.domain.DossierFacade;
+import fr.laposte.disf.canal.h7z.domain.service.ContenuService;
+import fr.laposte.disf.canal.h7z.helper.AppConstants;
+import fr.laposte.disf.fwmc.arch.rest.annotation.ResourceMap;
+import fr.laposte.disf.fwmc.arch.rest.annotation.ResourceVersion;
+import fr.laposte.disf.fwmc.arch.rest.annotation.RestCtrlResource;
+import fr.laposte.disf.fwmc.arch.rest.impl.DefaultController;
+import fr.laposte.disf.fwmc.core.ApplicationManager;
+import fr.laposte.disf.fwmc.core.error.ApplicationException;
+import fr.laposte.disf.fwmc.core.log.Logger;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.annotation.Secured;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
+import reactor.core.publisher.Mono;
+
+import java.util.List;
+
+import static fr.laposte.disf.canal.h7z.api.piecedemande.ApiMapConstantes.KEY_RECUPERATION_CONTENU_PDF;
+import static fr.laposte.disf.canal.h7z.api.piecedemande.ApiMapConstantes.KEY_RECUPERATION_PIECES_DEMANDE_PAR_ID_DOSSIER;
+import static fr.laposte.disf.canal.h7z.api.piecedemande.ApiMapConstantes.URL_RECUPERATION_CONTENU_PDF;
+import static fr.laposte.disf.canal.h7z.api.piecedemande.ApiMapConstantes.URL_RECUPERATION_PIECES_DEMANDE_PAR_ID_DOSSIER;
+
+@ResourceVersion(1)
+@RequiredArgsConstructor(onConstructor = @__(@Autowired))
+@RestCtrlResource(url = "/demande")
+public class PieceDemandeController extends DefaultController {
+
+    private static final Logger LOGGER = ApplicationManager.getLogger(PieceDemandeController.class);
+
+    private final DossierFacade facade;
+
+    private final PieceDemandeMapper pieceDemandeMapper;
+
+    private final ContenuService contenuService;
+
+
+    @Secured(AppConstants.SERVICE_BANCAIRE_SB096)
+    @GetMapping(value = URL_RECUPERATION_PIECES_DEMANDE_PAR_ID_DOSSIER, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    @ResourceMap(rel = KEY_RECUPERATION_PIECES_DEMANDE_PAR_ID_DOSSIER, genParams = ResourceMap.Generate.BY_VALUE_ELSE_BY_NAME)
+    @ApiOperation(value = KEY_RECUPERATION_PIECES_DEMANDE_PAR_ID_DOSSIER, notes = "Récupère les documents de la demande")
+    // TODO : mettre une liste dans ApiResponse et non juste l'objet.
+    @ApiResponses(value = {@ApiResponse(code = 200, message = "Documents récupérés", response = PieceDemandeApi.class), @ApiResponse(code = 404, message = "Documents non trouvés", response = ErrorModel.class),
+            @ApiResponse(code = 500, message = "Erreur système", response = ErrorModel.class)})
+    public Mono<ResponseEntity<List<PieceDemandeApi>>> recuperer(
+            @PathVariable(value = "identifiantDossier") final String identifiantDossier) throws ApplicationException {
+        LOGGER.info("[PieceDemandeController.recuperer] identifiant dossier : %s", identifiantDossier);
+
+        var listePiecesDemandeApi = pieceDemandeMapper.mapList(facade.recupererPieces(identifiantDossier));
+
+        LOGGER.info("[PieceDemandeController.recuperer] pieces de la demande : %s", listePiecesDemandeApi);
+
+        return Mono.just(ResponseEntity.ok(listePiecesDemandeApi));
+    }
+
+    @GetMapping(value = URL_RECUPERATION_CONTENU_PDF, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    @ResourceMap(rel = KEY_RECUPERATION_CONTENU_PDF, genParams = ResourceMap.Generate.BY_VALUE_ELSE_BY_NAME)
+    @ApiOperation(value = KEY_RECUPERATION_CONTENU_PDF, notes = "Récupère le contenu pdf du document")
+    @ApiResponses(value = {@ApiResponse(code = 200, message = "Documents récupérés", response = byte[].class), @ApiResponse(code = 404, message = "Documents non trouvés", response = ErrorModel.class),
+        @ApiResponse(code = 500, message = "Erreur système", response = ErrorModel.class)})
+    public Mono<ResponseEntity<Contenu>> recupererContenuPdf(
+        @PathVariable final String identifiantPiece,
+        @RequestParam final String codeTypologie,
+        @RequestParam final String codeContexte,
+        @RequestParam final String codeEtablissement,
+        @RequestParam final String codeAuthentification) {
+        LOGGER.info("[PieceDemandeController.recupereDocument] identifiant piece : %s", identifiantPiece);
+
+        var contexte = ContextePiece.builder().codeContexte(codeContexte).codeEtablissement(codeEtablissement).codeAuthentification(codeAuthentification).build();
+        var contenu = contenuService.recuperer(identifiantPiece, codeTypologie, contexte);
+
+        LOGGER.info("[PieceDemandeController.recupererDocument] contenu de la piece present : %s", contenu.isPresent());
+
+        return Mono.just(ResponseEntity.ok(contenu));
+    }
+
+
+
+}
+
+
+
+
+package fr.laposte.disf.canal.h7z.api;
+
+import fr.laposte.disf.canal.h7z.api.piecedemande.PieceDemandeController;
+import fr.laposte.disf.canal.h7z.api.piecedemande.mapper.PieceDemandeMapper;
+import fr.laposte.disf.canal.h7z.domain.DossierFacade;
+import fr.laposte.disf.canal.h7z.domain.PieceDemande;
+import fr.laposte.disf.canal.h7z.fixture.PieceDemandeFixture;
+import fr.laposte.disfe.fwroa.test.bootstrap.DefaultCanalTest;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.junit.MockitoJUnitRunner;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@RunWith(MockitoJUnitRunner.Silent.class)
+public class PieceDemandeControllerTest extends DefaultCanalTest {
+
+    private MockMvc mockMvc;
+
+    @Mock
+    private DossierFacade facade;
+
+    @Mock
+    private PieceDemandeMapper mapper;
+
+    PieceDemandeController pieceDemandeController;
+
+    @Before
+    public void prepare() {
+        pieceDemandeController = new PieceDemandeController(facade, mapper, null);
+        mockMvc = standaloneBuild(pieceDemandeController);
+    }
+
+    @Test
+    public void testRecupererPieceDemande() throws Exception {
+        String idDossier = "123456";
+        List<PieceDemande> pieceDemandeList = new ArrayList<>();
+        var pieceDemande = PieceDemandeFixture.getDefault();
+        pieceDemandeList.add(pieceDemande);
+        Mockito.doReturn(pieceDemandeList).when(facade).recupererPieces(idDossier);
+        final MvcResult mvcResult = mockMvc.perform(get("/api/v1/demande/{identifiantDossier}/pieces", idDossier).contentType(MediaType.APPLICATION_JSON_VALUE)).andExpect(request().asyncStarted()).andReturn();
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+    }
+
+
+}
