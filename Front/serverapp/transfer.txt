@@ -1086,7 +1086,7 @@ class GedAccesseurTest extends DefaultCanalTest {
                 .build();
 
         var listeObjets = new ListeObjetsV3();
-        
+
         given(reactAsyncRestOperations.getForEntity(anyString(), eq(ListeObjetsV3.class), any()))
             .willReturn(Mono.just(ResponseEntity.ok(listeObjets)));
 
@@ -1126,43 +1126,43 @@ class GedAccesseurTest extends DefaultCanalTest {
 @Test
 void doitRecupererPremierDocumentAvecPlusieursContextes() {
     given(api.get(KEY_RECUPERER_DOCUMENT)).willReturn("http://localhost:8090/url");
-    
+
     var contexte1 = ContextePiece.builder()
             .codeContexte("contexte1")
             .codeAuthentification("auth1")
             .codeEtablissement("etab1")
             .build();
-    
+
     var contexte2 = ContextePiece.builder()
             .codeContexte("contexte2")
             .codeAuthentification("auth2")
             .codeEtablissement("etab2")
             .build();
-    
+
     var flux1 = new QNIFlux();
     var flux2 = new QNIFlux();
-    
+
     given(reactAsyncRestOperations.getForEntity(anyString(), eq(QNIFlux.class), any()))
         .willReturn(Mono.just(flux1), Mono.just(flux2));
-    
+
     var result = gedAccesseur.recupererDocumentSiPlusieursContextes("1234", "T0021", List.of(contexte1, contexte2));
-    
+
     assertThat(result).isEqualTo(flux1);
 }
 
 @Test
 void doitGererExceptionLorsDeRecuperationSiPlusieursContextes() {
     given(api.get(KEY_RECUPERER_DOCUMENT)).willReturn("http://localhost:8090/url");
-    
+
     var contexte1 = ContextePiece.builder()
             .codeContexte("contexte1")
             .codeAuthentification("auth1")
             .codeEtablissement("etab1")
             .build();
-    
+
     given(reactAsyncRestOperations.getForEntity(anyString(), eq(QNIFlux.class), any()))
         .willReturn(Mono.error(new RuntimeException("Erreur lors de la récupération")));
-    
+
     try {
         gedAccesseur.recupererDocumentSiPlusieursContextes("1234", "T0021", List.of(contexte1));
         fail("Expected RuntimeException to be thrown");
@@ -1172,3 +1172,83 @@ void doitGererExceptionLorsDeRecuperationSiPlusieursContextes() {
 }
 
 
+=========================
+Partie réflexion
+Une étude autour de la gestion documentaire dans les entreprises et surtout dans le secteur bancaire ?
+(site intéressant : https://www.ged.fr/controle-des-documents/)
+
+Proposition de Taha
+	Thème : Transformation Numérique dans le Secteur Bancaire : Optimisation et Rationalisation des Processus de Gestion Documentaire
+ la deuxième partie :
+1– Problématique
+    Choix du thème : justifier le choix du thème de la gestion documentaire et son importance sous les aspects techniques, économiques et réglementaires.
+    État de l'art : Revue de la littérature et comparaison avec des expériences similaires.
+2 – Analyse Critique et Propositions
+    Analyse des défis : discuter des principales difficultés rencontrées dans les systèmes actuels de gestion documentaire.
+    Propositions d'amélioration : Suggestions des améliorations basées sur des études de cas et des données, avec un focus sur des solutions innovantes.
+3– Conclusions et Perspectives Futures
+    Synthèse de l'expérience et des apprentissages : Ce que l'étude a apporté en termes de compréhension et de compétences.
+    Perspectives futures : Idées pour les développements futurs dans le domaine de la gestion documentaire.
+Mon plan à améliorer
+Introduction
+Pourquoi est ce que j’ai fait le choix du thème
+Ce qui m’intéressait
+Ce que j’ai appris
+L’univers de mon thème (IE le contexte où est ce que ça s’applique, qui le fait comment ? pourquoi ? qu’est ce qu’ils ont eu comme problème avec et les solutions est ce qu’ils envisagent continuer avec ou bien changer ?)
+Ce qu’on fait dans ma boite les bons les mauvais ce qu’on doit améliorer et comment ?
+Conclusion
+
+Plan réflexion V1
+Introduction
+ Contexte et Justification du Thème
+- Présentation de la transformation numérique dans le secteur bancaire.
+- Importance de la gestion documentaire pour les banques en termes techniques, économiques et réglementaires.
+- Objectifs du mémoire : Optimisation et rationalisation des processus de gestion documentaire.
+ Chapitre 1 : Problématique et État de l'Art
+1. Problématique
+- Définition des concepts clés : transformation numérique, gestion documentaire, optimisation et rationalisation.
+ - Présentation de la problématique : Quels sont les défis et enjeux actuels de la gestion documentaire dans les banques ?
+ 2. État de l'Art
+ - Revue de la littérature sur la gestion documentaire et la transformation numérique dans le secteur bancaire.
+ - Comparaison avec des expériences similaires dans d'autres banques et secteurs.
+- Présentation des technologies actuelles utilisées pour la gestion documentaire.
+Chapitre 2 : Analyse Critique des Systèmes Actuels
+1. Analyse des Défis Actuels
+ - Identification des principales difficultés rencontrées dans les systèmes actuels de gestion documentaire.
+ - Études de cas illustrant ces défis dans différentes banques.
+2. Évaluation des Systèmes Actuels
+ - Analyse des systèmes de gestion documentaire existants dans votre entreprise.
+- Discussion des points forts et des faiblesses de ces systèmes.
+
+ Chapitre 3 : Propositions d'Amélioration
+1. Solutions Innovantes
+- Propositions de solutions innovantes pour l'optimisation et la rationalisation des processus de gestion documentaire.
+- Technologies émergentes et leur application (IA, blockchain, etc.).
+2. Études de Cas et Données
+- Présentation de cas d'études réussies de transformation numérique dans la gestion documentaire.
+- Données et analyses pour soutenir les propositions.
+ 3. Impact et Avantages
+ - Discussion des avantages potentiels des propositions en termes d'efficacité, de réduction des coûts et de conformité réglementaire.
+  Chapitre 4 : Mise en Œuvre et Analyse dans votre Entreprise
+ 1. État Actuel de la Gestion Documentaire
+ - Description détaillée des processus de gestion documentaire actuels dans votre entreprise. - Identification des points à améliorer.
+ 2. Propositions d'Amélioration Spécifiques à votre Entreprise
+ - Suggestions d'améliorations basées sur les analyses précédentes.
+- Plan de mise en œuvre des solutions proposées.
+3. Évaluation des Résultats Attendues
+- Méthodes d'évaluation de l'impact des améliorations proposées.
+ - Indicateurs de performance à utiliser.
+ Chapitre 5 : Conclusions et Perspectives Futures
+ 1. Synthèse des Résultats
+ - Récapitulation des principaux résultats et apprentissages de l'étude.
+- Impact des propositions sur la gestion documentaire et les processus bancaires.
+2. Perspectives Futures
+- Idées pour les développements futurs dans le domaine de la gestion documentaire numérique.
+- Recommandations pour les banques concernant la poursuite de la transformation numérique.
+Conclusion
+- Réflexion globale sur l'étude et son impact potentiel sur le secteur bancaire
+ - Implications pratiques pour les institutions financières.
+ - Conclusion sur l'importance de continuer à innover dans la gestion documentaire.
+  Annexes
+– Documentation supplémentaire : graphiques, tableaux, études de cas détaillées, etc.
+ - Bibliographie : Liste des références utilisées dans le mémoire
